@@ -32,6 +32,16 @@ async function writeLeads(leads: Lead[]): Promise<void> {
   await fs.writeFile(LEADS_FILE, JSON.stringify(leads, null, 2));
 }
 
+function normalizePhoneToE164(phoneRaw: string): string {
+  const clean = phoneRaw.replace(/[^\d+]/g, '').trim();
+  if (clean.startsWith('+')) return clean;
+  // Ireland defaults: 08xxxxxxxx -> +3538xxxxxxxx
+  if (clean.startsWith('0')) return `+353${clean.slice(1)}`;
+  // If already country-prefixed without +
+  if (clean.startsWith('353')) return `+${clean}`;
+  return clean;
+}
+
 export async function POST(req: NextRequest) {
   let body: unknown;
   try {
@@ -59,11 +69,13 @@ export async function POST(req: NextRequest) {
   const leadId = uuidv4();
   const timestamp = new Date().toISOString();
 
+  const normalizedPhone = normalizePhoneToE164((phone as string).trim());
+
   const lead: Lead = {
     leadId,
     timestamp,
     name: (name as string).trim(),
-    phone: (phone as string).trim(),
+    phone: normalizedPhone,
     email: (email as string).trim().toLowerCase(),
     companyName: (companyName as string).trim(),
     consent: consent === true,
