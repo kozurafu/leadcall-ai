@@ -263,7 +263,7 @@ export default function HomePage() {
           <p className="text-sm text-gray-500">
             &copy; {new Date().getFullYear()} LeadCall AI. All rights reserved.
           </p>
-          <p className="text-xs text-gray-600">Ref: 2e950173-09ba-49f6-bcbf-a1240f20c0ee</p>
+          <p className="text-xs text-gray-600">Demo environment</p>
         </div>
       </footer>
     </main>
