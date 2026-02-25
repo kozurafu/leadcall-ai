@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function HomePage() {
   const [form, setForm] = useState({
@@ -11,6 +11,15 @@ export default function HomePage() {
   });
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
+  const [countdown, setCountdown] = useState(60);
+
+  useEffect(() => {
+    if (status !== 'success' || countdown <= 0) return;
+    const timer = setInterval(() => {
+      setCountdown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [status, countdown]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -20,6 +29,8 @@ export default function HomePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus('loading');
+    setMessage('');
+    setCountdown(60);
     try {
       const res = await fetch('/api/demo/submit', {
         method: 'POST',
@@ -186,10 +197,15 @@ export default function HomePage() {
           </div>
 
           {status === 'success' ? (
-            <div className="bg-green-500/10 border border-green-500/30 rounded-2xl p-8 text-center">
-              <div className="text-5xl mb-4">\ud83d\udcde</div>
-              <h3 className="text-xl font-bold text-green-400 mb-2">You&apos;re on the list!</h3>
+            <div className="bg-green-500/10 border border-green-500/30 rounded-2xl p-8 text-center space-y-3">
+              <div className="text-5xl mb-1">\ud83d\udcde</div>
+              <h3 className="text-xl font-bold text-green-400 mb-1">You&apos;re on the list!</h3>
               <p className="text-gray-300">{message}</p>
+              <div className="inline-flex items-center gap-2 rounded-full bg-gray-900/70 border border-gray-700 px-4 py-2">
+                <span className="text-xs text-gray-400">Expected call in</span>
+                <span className="text-lg font-bold text-brand-400">{countdown}s</span>
+              </div>
+              <p className="text-xs text-gray-500">Keep this page open while your demo call is being placed.</p>
             </div>
           ) : (
             <form
