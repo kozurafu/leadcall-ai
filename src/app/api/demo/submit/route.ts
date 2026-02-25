@@ -77,6 +77,7 @@ export async function POST(req: NextRequest) {
 
   // Forward to n8n webhook if configured
   const n8nWebhook = process.env.N8N_DEMO_WEBHOOK;
+  let n8nAccepted = false;
   if (n8nWebhook) {
     try {
       const n8nRes = await fetch(n8nWebhook, {
@@ -94,25 +95,22 @@ export async function POST(req: NextRequest) {
         }),
       });
 
-      if (n8nRes.ok) {
-        lead.callTriggered = true;
-        const updatedLeads = await readLeads();
-        const idx = updatedLeads.findIndex((l) => l.leadId === leadId);
-        if (idx !== -1) updatedLeads[idx] = lead;
-        await writeLeads(updatedLeads);
+      n8nAccepted = n8nRes.ok;
+      if (!n8nRes.ok) {
+        console.error('[n8n webhook] Non-OK response:', n8nRes.status, await n8nRes.text());
       }
     } catch (err) {
       console.error('[n8n webhook] Failed to forward lead:', err);
     }
   }
 
-  // Trigger Vapi outbound call directly only if n8n webhook is not configured.
+  // Trigger Vapi outbound call directly if n8n is not configured OR n8n handoff fails.
   // In production we prefer n8n orchestration for workflow control + secret isolation.
   const vapiApiKey = process.env.VAPI_API_KEY;
   const vapiAssistantId = process.env.VAPI_ASSISTANT_ID;
   const vapiPhoneNumberId = process.env.VAPI_PHONE_NUMBER_ID;
 
-  if (!n8nWebhook && vapiApiKey && vapiAssistantId && vapiPhoneNumberId) {
+  if ((!n8nWebhook || !n8nAccepted) && vapiApiKey && vapiAssistantId && vapiPhoneNumberId) {
     try {
       const callPayload = {
         assistantId: vapiAssistantId,
@@ -166,6 +164,14 @@ export async function POST(req: NextRequest) {
     } catch (err) {
       console.error('[Vapi] Error triggering call:', err);
     }
+  }
+
+  if (n8nAccepted) {
+    lead.callTriggered = true;
+    const updatedLeads = await readLeads();
+    const idx = updatedLeads.findIndex((l) => l.leadId === leadId);
+    if (idx !== -1) updatedLeads[idx] = lead;
+    await writeLeads(updatedLeads);
   }
 
   return NextResponse.json(
