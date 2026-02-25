@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
   const n8nWebhook = process.env.N8N_DEMO_WEBHOOK;
   if (n8nWebhook) {
     try {
-      await fetch(n8nWebhook, {
+      const n8nRes = await fetch(n8nWebhook, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -93,17 +93,26 @@ export async function POST(req: NextRequest) {
           source: 'leadcall-ai-demo',
         }),
       });
+
+      if (n8nRes.ok) {
+        lead.callTriggered = true;
+        const updatedLeads = await readLeads();
+        const idx = updatedLeads.findIndex((l) => l.leadId === leadId);
+        if (idx !== -1) updatedLeads[idx] = lead;
+        await writeLeads(updatedLeads);
+      }
     } catch (err) {
       console.error('[n8n webhook] Failed to forward lead:', err);
     }
   }
 
-  // Trigger Vapi outbound call if configured
+  // Trigger Vapi outbound call directly only if n8n webhook is not configured.
+  // In production we prefer n8n orchestration for workflow control + secret isolation.
   const vapiApiKey = process.env.VAPI_API_KEY;
   const vapiAssistantId = process.env.VAPI_ASSISTANT_ID;
   const vapiPhoneNumberId = process.env.VAPI_PHONE_NUMBER_ID;
 
-  if (vapiApiKey && vapiAssistantId && vapiPhoneNumberId) {
+  if (!n8nWebhook && vapiApiKey && vapiAssistantId && vapiPhoneNumberId) {
     try {
       const callPayload = {
         assistantId: vapiAssistantId,
