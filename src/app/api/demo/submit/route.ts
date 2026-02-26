@@ -119,68 +119,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Trigger Vapi outbound call directly if n8n is not configured OR n8n handoff fails.
-  // In production we prefer n8n orchestration for workflow control + secret isolation.
-  const vapiApiKey = process.env.VAPI_API_KEY;
-  const vapiAssistantId = process.env.VAPI_ASSISTANT_ID;
-  const vapiPhoneNumberId = process.env.VAPI_PHONE_NUMBER_ID;
-
-  if ((!n8nWebhook || !n8nAccepted) && vapiApiKey && vapiAssistantId && vapiPhoneNumberId) {
-    try {
-      const callPayload = {
-        assistantId: vapiAssistantId,
-        phoneNumberId: vapiPhoneNumberId,
-        customer: {
-          number: lead.phone,
-          name: lead.name,
-        },
-        assistantOverrides: {
-          variableValues: {
-            leadId,
-            customerName: lead.name,
-            companyName: lead.companyName,
-            email: lead.email,
-          },
-          metadata: {
-            leadId,
-            email: lead.email,
-            companyName: lead.companyName,
-            qualificationGoals: [
-              'solar_panels',
-              'battery_storage',
-              'eddi_diverter',
-              'ev_charger',
-            ],
-          },
-        },
-      };
-
-      const vapiRes = await fetch('https://api.vapi.ai/call/phone', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${vapiApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(callPayload),
-      });
-
-      if (vapiRes.ok) {
-        const callData = await vapiRes.json() as { id?: string };
-        // Update lead with callId
-        lead.callTriggered = true;
-        lead.callId = callData.id;
-        const updatedLeads = await readLeads();
-        const idx = updatedLeads.findIndex((l) => l.leadId === leadId);
-        if (idx !== -1) updatedLeads[idx] = lead;
-        await writeLeads(updatedLeads);
-      } else {
-        console.error('[Vapi] Call trigger failed:', await vapiRes.text());
-      }
-    } catch (err) {
-      console.error('[Vapi] Error triggering call:', err);
-    }
-  }
-
+  // Security-first: call orchestration is handled in n8n only.
+  // We intentionally do NOT call Vapi directly from this app.
   if (n8nAccepted) {
     lead.callTriggered = true;
     const updatedLeads = await readLeads();
