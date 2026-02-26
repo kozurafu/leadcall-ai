@@ -132,45 +132,39 @@ export async function POST(req: NextRequest) {
     if (idx !== -1) updatedLeads[idx] = lead;
     await writeLeads(updatedLeads);
   } else {
-    // Fallback: call Vapi directly
+    // Fallback: fire Vapi call in background (non-blocking) so response is instant
     const vapiKey = process.env.VAPI_API_KEY;
     const assistantId = process.env.VAPI_ASSISTANT_ID;
     const phoneNumberId = process.env.VAPI_PHONE_NUMBER_ID;
     if (vapiKey && assistantId && phoneNumberId) {
-      try {
-        const vapiRes = await fetch('https://api.vapi.ai/call/phone', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${vapiKey}` },
-          body: JSON.stringify({
-            assistantId,
-            phoneNumberId,
-            customer: { number: lead.phone, name: lead.name },
-            assistantOverrides: {
-              variableValues: {
-                leadId, name: lead.name, phone: lead.phone,
-                email: lead.email, companyName: lead.companyName,
-              },
+      lead.callTriggered = true;
+      const updatedLeads = await readLeads();
+      const idx = updatedLeads.findIndex((l) => l.leadId === leadId);
+      if (idx !== -1) updatedLeads[idx] = lead;
+      await writeLeads(updatedLeads);
+      // Fire-and-forget — don't await
+      fetch('https://api.vapi.ai/call/phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${vapiKey}` },
+        body: JSON.stringify({
+          assistantId,
+          phoneNumberId,
+          customer: { number: lead.phone, name: lead.name },
+          assistantOverrides: {
+            variableValues: {
+              leadId, name: lead.name, phone: lead.phone,
+              email: lead.email, companyName: lead.companyName,
             },
-          }),
-        });
-        if (vapiRes.ok) {
-          const vapiData = await vapiRes.json() as { id?: string };
-          lead.callTriggered = true;
-          lead.callId = vapiData.id;
-          n8nError = '';
-          const updatedLeads = await readLeads();
-          const idx = updatedLeads.findIndex((l) => l.leadId === leadId);
-          if (idx !== -1) updatedLeads[idx] = lead;
-          await writeLeads(updatedLeads);
+          },
+        }),
+      }).then(async (res) => {
+        if (res.ok) {
+          const data = await res.json() as { id?: string };
+          console.log('[vapi] call placed:', data.id);
         } else {
-          const t = await vapiRes.text();
-          n8nError = `Vapi fallback failed: ${vapiRes.status} ${t.slice(0, 200)}`;
-          console.error('[vapi fallback]', n8nError);
+          console.error('[vapi] call failed:', res.status, await res.text());
         }
-      } catch (err) {
-        n8nError = `Vapi fallback error: ${err instanceof Error ? err.message : String(err)}`;
-        console.error('[vapi fallback]', n8nError);
-      }
+      }).catch((err) => console.error('[vapi] call error:', err));
     }
   }
 
