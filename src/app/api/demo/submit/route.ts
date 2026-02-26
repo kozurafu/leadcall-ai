@@ -34,11 +34,14 @@ async function writeLeads(leads: Lead[]): Promise<void> {
 
 function normalizePhoneToE164(phoneRaw: string): string {
   const clean = phoneRaw.replace(/[^\d+]/g, '').trim();
+  if (!clean) return clean;
   if (clean.startsWith('+')) return clean;
   // Ireland defaults: 08xxxxxxxx -> +3538xxxxxxxx
   if (clean.startsWith('0')) return `+353${clean.slice(1)}`;
   // If already country-prefixed without +
   if (clean.startsWith('353')) return `+${clean}`;
+  // Common mobile shorthand users enter: 83xxxxxxx / 87xxxxxxx etc
+  if (/^8\d{8}$/.test(clean)) return `+353${clean}`;
   return clean;
 }
 
@@ -188,9 +191,11 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json(
     {
-      success: true,
+      success: lead.callTriggered,
       leadId,
-      message: 'Demo request received. Our AI will call you within 60 seconds.',
+      message: lead.callTriggered
+        ? 'Demo request received. Our AI will call you within 60 seconds.'
+        : 'We received your request but could not place the call automatically. Please confirm phone format includes country code (e.g. +353...) and try again.',
       callTriggered: lead.callTriggered,
     },
     { status: 201 },

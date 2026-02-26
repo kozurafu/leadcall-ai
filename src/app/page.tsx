@@ -21,6 +21,19 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, [status, countdown]);
 
+  useEffect(() => {
+    if (status !== 'success' || countdown !== 0) return;
+    setMessage('Countdown finished. If you did not receive a call, please try again or check your phone number format.');
+
+    const resetTimer = setTimeout(() => {
+      setStatus('idle');
+      setMessage('');
+      setCountdown(60);
+    }, 5000);
+
+    return () => clearTimeout(resetTimer);
+  }, [status, countdown]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
     setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
@@ -38,13 +51,13 @@ export default function HomePage() {
         body: JSON.stringify(form),
       });
       const data = await res.json();
-      if (res.ok) {
+      if (res.ok && data.callTriggered) {
         setStatus('success');
         setMessage(data.message || 'Request received! Our AI will call you shortly.');
         setForm({ name: '', phone: '', email: '', companyName: '', consent: false });
       } else {
         setStatus('error');
-        setMessage(data.error || 'Something went wrong. Please try again.');
+        setMessage(data.message || data.error || 'Call was not triggered. Please check your phone number and try again.');
       }
     } catch {
       setStatus('error');
