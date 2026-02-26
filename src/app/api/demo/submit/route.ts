@@ -93,6 +93,7 @@ export async function POST(req: NextRequest) {
   // Forward to n8n webhook if configured
   const n8nWebhook = process.env.N8N_DEMO_WEBHOOK;
   let n8nAccepted = false;
+  let n8nError = '';
   if (n8nWebhook) {
     try {
       const n8nRes = await fetch(n8nWebhook, {
@@ -112,9 +113,13 @@ export async function POST(req: NextRequest) {
 
       n8nAccepted = n8nRes.ok;
       if (!n8nRes.ok) {
-        console.error('[n8n webhook] Non-OK response:', n8nRes.status, await n8nRes.text());
+        const bodyText = await n8nRes.text();
+        n8nError = `n8n webhook returned ${n8nRes.status}${bodyText ? `: ${bodyText.slice(0, 200)}` : ''}`;
+        console.error('[n8n webhook] Non-OK response:', n8nRes.status, bodyText);
       }
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      n8nError = `n8n webhook request failed: ${msg}`;
       console.error('[n8n webhook] Failed to forward lead:', err);
     }
   }
@@ -137,6 +142,7 @@ export async function POST(req: NextRequest) {
         ? 'Demo request received. Our AI will call you within 60 seconds.'
         : 'We received your request but could not place the call automatically. Please confirm phone format includes country code (e.g. +353...) and try again.',
       callTriggered: lead.callTriggered,
+      n8nError: lead.callTriggered ? undefined : n8nError || undefined,
     },
     { status: 201 },
   );
