@@ -90,7 +90,7 @@ export default function HomePage() {
         </div>
         <h1 className="text-5xl md:text-7xl font-extrabold leading-tight tracking-tight mb-6">
           Stop Chasing Leads.<br />
-          <span className="text-brand-500">Let AI Book Your Appointments.</span>
+          <span className="text-brand-500">Let AI Do It For You!</span>
         </h1>
         <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-10">
           LeadCall AI calls every inbound lead within 60 seconds, qualifies them with a natural
