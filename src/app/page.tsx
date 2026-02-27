@@ -226,7 +226,7 @@ export default function HomePage() {
               className="bg-gray-900 border border-gray-800 rounded-2xl p-8 space-y-5"
             >
               {[
-                { id: 'name', label: 'Full Name', type: 'text', placeholder: 'Jane Smith', required: true },
+                { id: 'name', label: 'First Name', type: 'text', placeholder: 'Jane', required: true },
                 { id: 'phone', label: 'Phone Number', type: 'tel', placeholder: '+353 1 234 5678', required: true },
                 { id: 'email', label: 'Work Email', type: 'email', placeholder: 'jane@company.com', required: true },
                 { id: 'companyName', label: 'Company Name', type: 'text', placeholder: 'Acme Ltd', required: true },
