@@ -72,7 +72,8 @@ function findLead(leads: Lead[], identifiers: { leadId?: string; phone?: string;
   return undefined;
 }
 
-function buildEmailHtml(lead: Lead, callRecord: CallRecord): string {
+/** @deprecated Email HTML is now generated in n8n. Kept for reference. */
+function _buildEmailHtml_UNUSED(lead: Lead, callRecord: CallRecord): string {
   const sd = (callRecord.structuredData || {}) as Record<string, unknown>;
   const name = lead.name || display(sd.customer_name);
   const appUrl = process.env.NEXTAUTH_URL || 'http://okg4gks008k4ko8ckow4cwwo.62.171.142.50.sslip.io';
@@ -231,9 +232,10 @@ export async function POST(req: NextRequest) {
 
   console.log('[vapi callback] leadId:', callRecord.leadId, 'phone:', callRecord.phone, 'email:', callRecord.email);
 
-  // Persist call record
+  // Persist call record — check if we already processed this call (for email dedup)
   const calls = await readJson<CallRecord>(CALLS_FILE);
   const existingIdx = calls.findIndex((c) => c.callId === callId);
+  const alreadyProcessed = existingIdx !== -1 && calls[existingIdx].status === 'end-of-call-report';
   if (existingIdx !== -1) calls[existingIdx] = { ...calls[existingIdx], ...callRecord };
   else calls.unshift(callRecord);
   await writeJson(CALLS_FILE, calls);
@@ -257,26 +259,31 @@ export async function POST(req: NextRequest) {
 
   console.log('[vapi callback] Lead found:', !!foundLead, 'name:', lead.name, 'email:', lead.email);
 
-  // Send email
+  // Forward to n8n for email — only when we have a summary (complete report)
+  // and only once per call (skip duplicates)
   const recipientEmail = lead.email || callRecord.email;
-  if (recipientEmail) {
-    const emailHtml = buildEmailHtml(lead, callRecord);
-    const subject = `Your LeadCall AI Demo — Call Summary${lead.companyName ? ` for ${lead.companyName}` : ''}`;
-
-    // Send via n8n (which handles SMTP)
+  const hasSummary = !!callRecord.summary && callRecord.summary.length > 10;
+  if (recipientEmail && !alreadyProcessed && hasSummary) {
     const n8nWebhook = process.env.N8N_DEMO_WEBHOOK;
     if (n8nWebhook) {
       try {
+        const sd = (callRecord.structuredData || {}) as Record<string, unknown>;
         const res = await fetch(n8nWebhook, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            event: 'send_email',
-            to: recipientEmail,
-            subject,
-            html: emailHtml,
+            event: 'call_completed',
             callId,
             leadId: callRecord.leadId,
+            to: recipientEmail,
+            customerName: lead.name || callRecord.customerName || '',
+            companyName: lead.companyName || callRecord.companyName || '',
+            phone: lead.phone || callRecord.phone || '',
+            summary: callRecord.summary,
+            transcript: callRecord.transcript || '',
+            structuredData: sd,
+            duration: callRecord.duration,
+            endedReason: callRecord.endedReason,
           }),
         });
         console.log('[email] n8n response:', res.status);
@@ -284,6 +291,8 @@ export async function POST(req: NextRequest) {
         console.error('[email] n8n send failed:', err);
       }
     }
+  } else if (!hasSummary) {
+    console.log('[vapi callback] Skipping email — no summary yet (incomplete report)');
   }
 
   return NextResponse.json({ received: true, callId });

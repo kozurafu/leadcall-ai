@@ -50,25 +50,31 @@ The `event` field in the payload distinguishes these two cases.
 
 **Triggered by:** `POST /api/webhooks/vapi` (forwarded to n8n)
 
-### Payload
+### Payload (updated 2026-02-28)
+
+n8n now owns the email template. The webhook sends raw data — n8n builds the HTML and sends via SMTP.
 
 ```json
 {
   "event": "call_completed",
   "callId": "vapi-call-id-xyz",
   "leadId": "550e8400-e29b-41d4-a716-446655440000",
-  "email": "jane@acme.com",
+  "to": "jane@acme.com",
   "customerName": "Jane Smith",
   "companyName": "Acme Ltd",
-  "summary": "Jane expressed strong interest in solar panels and battery storage. She owns a 4-bed semi-detached with south-facing roof. Budget is flexible. Ready to book a site survey.",
-  "transcript": "Agent: Hi Jane, this is Alex from LeadCall AI...\nJane: Oh hi, yes...",
-  "qualificationOutcomes": {
-    "solarPanels": true,
-    "batteryStorage": true,
-    "eddiDiverter": false,
-    "evCharger": true,
-    "readyToBuy": true
-  }
+  "phone": "+353 1 234 5678",
+  "summary": "Jane expressed strong interest in solar panels and battery storage...",
+  "transcript": "AI: Hi Jane...\nUser: Oh hi, yes...",
+  "structuredData": {
+    "business_type": "Retail",
+    "wants_follow_up": true,
+    "follow_up_time_preference": "Thursday 2pm",
+    "qualification_score": 8,
+    "pain_points": "Missing inbound calls",
+    "recommended_next_step": "Book demo"
+  },
+  "duration": 185,
+  "endedReason": "assistant-ended-call"
 }
 ```
 
